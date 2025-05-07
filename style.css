@@ -9,3 +9,9 @@ body, html {
   height: 100vh;
   color: #fff;
   font-family: sans-serif;
+}
+
+canvas {
+  border: 2px solid #fff;
+  background: #000;
+}
