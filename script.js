@@ -57,10 +57,10 @@ function draw() {
   }
   // Draw player sprite centered in tile
   const img = spriteFrames[frameIndex];
-  const px = player.x * tileSize + (tileSize - 32) / 2;
-  const py = player.y * tileSize + (tileSize - 32) / 2;
+  const px = player.x * tileSize + (tileSize - 64) / 2;
+  const py = player.y * tileSize + (tileSize - 64) / 2;
   if (img.complete) {
-    ctx.drawImage(img, px, py, 32, 32);
+    ctx.drawImage(img, px, py, 64, 64);
   }
 }
 
