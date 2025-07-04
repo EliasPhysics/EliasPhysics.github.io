@@ -1,13 +1,341 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Maze Runner</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Jump and Run Sidescroller</title>
+    <style>
+        /* Basic page reset */
+        body, html {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            display: flex;
+            flex-direction: column; /* Allow text above canvas */
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #fff;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background: #1e293b; /* A dark blue sky color */
+        }
+    </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="600" height="400"></canvas>
-  <script src="script.js"></script>
+    <h1>лера лера</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+// --- SETUP & CONSTANTS ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const tileSize = 40;
+
+// Physics and Game Constants
+const GRAVITY = 0.5;
+const PLAYER_SPEED = 5;
+const JUMP_FORCE = 12;
+
+// --- LEVEL DATA & MANAGEMENT ---
+
+// Rename original levelData to level1Data
+const level1Data = [
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+];
+
+// New level map
+const level2Data = [
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+    [1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+];
+
+// NEW: A structure to hold all our level data in one place
+const levels = [
+    {
+        map: level1Data,
+        enemies: [
+            { x: 400, y: 300 },
+            { x: 900, y: 200 },
+            { x: 1200, y: 300 }
+        ]
+    },
+    {
+        map: level2Data,
+        enemies: [
+            { x: 300, y: 400 },
+            { x: 700, y: 100 },
+            { x: 1000, y: 400 },
+            { x: 1400, y: 200 }
+        ]
+    }
+];
+
+// NEW: Variables to manage the current level state
+let currentLevelIndex = 0;
+let currentMap;
+let worldWidth;
+let gameWon = false;
+
+// --- PLAYER OBJECT --- (Unchanged)
+const player = { x: 100, y: 100, width: 32, height: 40, dx: 0, dy: 0, isOnGround: false, direction: 'right', health: 100, isAttacking: false, attackBox: { width: 40, height: 40 } };
+
+// --- ENEMY SETUP ---
+let enemies = [];
+function createEnemy(x, y) {
+    enemies.push({ x, y, width: 32, height: 32, dx: 1, dy: 0, health: 50, patrolRange: 120, patrolStart: x });
+}
+// NOTE: We no longer create enemies here. The loadLevel function will do it.
+
+// --- CAMERA --- (Unchanged)
+const camera = { x: 0, y: 0, width: canvas.width, height: canvas.height,
+    update: function() {
+        this.x = player.x - this.width / 2;
+        if (this.x < 0) this.x = 0;
+        if (this.x + this.width > worldWidth) this.x = worldWidth - this.width;
+    }
+};
+
+// --- SPRITE MANAGEMENT --- (Unchanged, assuming your file names are correct)
+const spritePaths = ['assets/girl1.png', 'assets/girl2.png'];
+const playerWalkSprites = [];
+let loadedImages = 0;
+let frameIndex = 0, frameCounter = 0;
+spritePaths.forEach(src => {
+    const img = new Image();
+    img.onload = () => {
+        loadedImages++;
+        if (loadedImages === spritePaths.length) {
+            loadLevel(0); // <-- MODIFIED: Load the first level instead of just starting the loop
+            requestAnimationFrame(gameLoop);
+        }
+    };
+    img.onerror = () => console.error(`Failed to load sprite: ${src}`);
+    img.src = src;
+    playerWalkSprites.push(img);
+});
+
+// --- INPUT HANDLING --- (Unchanged)
+const keys = { ArrowUp: false, ArrowLeft: false, ArrowRight: false, ' ': false, 'x': false, 'X': false };
+document.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = true; } });
+document.addEventListener('keyup', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = false; } });
+
+
+// NEW: Function to load a specific level
+function loadLevel(levelIndex) {
+    // Check if the player has finished the last level
+    if (levelIndex >= levels.length) {
+        gameWon = true;
+        return;
+    }
+
+    currentLevelIndex = levelIndex;
+    currentMap = levels[currentLevelIndex].map;
+    worldWidth = currentMap[0].length * tileSize;
+
+    // Reset player position
+    player.x = 100;
+    player.y = 100;
+    player.dx = 0;
+    player.dy = 0;
+
+    // Load enemies for the current level
+    enemies = []; // Clear old enemies
+    levels[currentLevelIndex].enemies.forEach(e => {
+        createEnemy(e.x, e.y);
+    });
+}
+
+
+// --- GAME LOGIC (UPDATE FUNCTION) ---
+function update() {
+    // 1. Handle Player Input (Unchanged)
+    if (keys.ArrowLeft) { player.dx = -PLAYER_SPEED; player.direction = 'left'; }
+    else if (keys.ArrowRight) { player.dx = PLAYER_SPEED; player.direction = 'right'; }
+    else { player.dx = 0; }
+    if ((keys.ArrowUp || keys[' ']) && player.isOnGround) { player.dy = -JUMP_FORCE; player.isOnGround = false; }
+    if ((keys['x'] || keys['X']) && !player.isAttacking) { player.isAttacking = true; setTimeout(() => { player.isAttacking = false; }, 300); }
+
+    // 2. Apply Physics (Unchanged)
+    player.dy += GRAVITY;
+    player.x += player.dx;
+    player.y += player.dy;
+    player.isOnGround = false;
+
+    // 3. Player vs. Level Collision (MODIFIED to use currentMap)
+    for (let row = 0; row < currentMap.length; row++) {
+        for (let col = 0; col < currentMap[row].length; col++) {
+            if (currentMap[row][col] > 0) { // Check for any solid tile (1 or 2)
+                const tile = { x: col * tileSize, y: row * tileSize, width: tileSize, height: tileSize };
+                if (player.x < tile.x + tile.width && player.x + player.width > tile.x && player.y < tile.y + tile.height && player.y + player.height > tile.y) {
+                    const overlapY = (player.y + player.height) - tile.y;
+                    const prevOverlapY = (player.y - player.dy + player.height) - tile.y;
+                    if (player.dy > 0 && prevOverlapY <= 0) { player.y = tile.y - player.height; player.dy = 0; player.isOnGround = true; }
+                }
+            }
+        }
+    }
+
+    // 4. Update Enemies (MODIFIED to use currentMap)
+    enemies.forEach(enemy => {
+        enemy.dy += GRAVITY;
+        enemy.y += enemy.dy;
+        const groundY = Math.floor((enemy.y + enemy.height) / tileSize);
+        const groundX = Math.floor((enemy.x + enemy.width / 2) / tileSize);
+        if (currentMap[groundY] && currentMap[groundY][groundX] > 0) {
+            enemy.y = groundY * tileSize - enemy.height;
+            enemy.dy = 0;
+            enemy.x += enemy.dx;
+            if (enemy.x < enemy.patrolStart || enemy.x > enemy.patrolStart + enemy.patrolRange) { enemy.dx *= -1; }
+        }
+    });
+
+    // 5. Combat and Enemy Collision (Unchanged)
+    if (player.isAttacking) {
+        let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
+        enemies.forEach((enemy, index) => {
+            if (attackX < enemy.x + enemy.width && attackX + player.attackBox.width > enemy.x && player.y < enemy.y + enemy.height && player.y + player.attackBox.height > enemy.y) {
+                enemy.health -= 50;
+                if (enemy.health <= 0) enemies.splice(index, 1);
+            }
+        });
+    }
+    enemies.forEach(enemy => {
+        if (player.x < enemy.x + enemy.width && player.x + player.width > enemy.x && player.y < enemy.y + enemy.height && player.y + player.height > enemy.y) {
+            player.health -= 1;
+        }
+    });
+
+    // 6. Update Camera (Unchanged)
+    camera.update();
+
+    // 7. Update Animation Frame (Unchanged)
+    if (player.dx !== 0 && player.isOnGround) {
+        frameCounter++;
+        if (frameCounter > 8) { frameIndex = (frameIndex + 1) % playerWalkSprites.length; frameCounter = 0; }
+    } else { frameIndex = 0; }
+
+    // NEW: 8. Check for Level Transition
+    if (player.x > worldWidth) {
+        loadLevel(currentLevelIndex + 1);
+    }
+}
+
+// --- RENDERING (DRAW FUNCTION) ---
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // Draw level (MODIFIED with conditional grass)
+    for (let y = 0; y < currentMap.length; y++) {
+        for (let x = 0; x < currentMap[y].length; x++) {
+            if (currentMap[y][x] > 0) { // Check for any solid tile (1 or 2)
+                // Draw the brown base tile first
+                ctx.fillStyle = '#6d4c41'; // Brown for dirt
+                ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+
+                // NEW: Only draw grass on top if the tile above is empty
+                const isTopTile = (y === 0 || currentMap[y - 1][x] === 0);
+                if (isTopTile) {
+                    ctx.fillStyle = '#8bc34a'; // Green for grass
+                    ctx.fillRect(x * tileSize, y * tileSize, tileSize, 5);
+                }
+            }
+        }
+    }
+    // Draw enemies (Unchanged)
+    ctx.fillStyle = 'red';
+    enemies.forEach(enemy => ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height));
+
+    // Draw player (Unchanged)
+    ctx.save();
+    if (player.direction === 'left') { ctx.scale(-1, 1); ctx.translate(-player.x * 2 - player.width, 0); }
+    if (playerWalkSprites[frameIndex]) { ctx.drawImage(playerWalkSprites[frameIndex], player.x, player.y, player.width, player.height); }
+    ctx.restore();
+
+    // Draw attack box for visualization (Unchanged)
+    if (player.isAttacking) {
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+        let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
+        ctx.fillRect(attackX, player.y, player.attackBox.width, player.attackBox.height);
+    }
+    ctx.restore();
+
+    // Draw UI (Unchanged)
+    ctx.fillStyle = 'red'; ctx.fillRect(10, 10, 200, 20);
+    ctx.fillStyle = 'green'; ctx.fillRect(10, 10, player.health * 2, 20);
+    ctx.strokeStyle = 'white'; ctx.strokeRect(10, 10, 200, 20);
+    ctx.fillStyle = 'white'; ctx.font = '16px Consolas';
+    ctx.fillText('HEALTH', 15, 26);
+    ctx.fillText(`Level: ${currentLevelIndex + 1}`, 10, 50); // Show current level
+
+    // Win/Loss Messages (MODIFIED with new gameWon state)
+    ctx.font = '60px Consolas'; ctx.textAlign = 'center';
+    if (player.health <= 0) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = 'red'; ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+    } else if (gameWon) { // NEW: Check for final win
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = 'gold'; ctx.fillText('GAME COMPLETE!', canvas.width / 2, canvas.height / 2);
+    } else if (enemies.length === 0) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = 'cyan';
+        ctx.fillText('LEVEL CLEAR!', canvas.width / 2, canvas.height / 2);
+        ctx.font = '20px Consolas';
+        ctx.fillText('Walk to the right to continue...', canvas.width/2, canvas.height/2 + 40);
+    }
+}
+
+// --- GAME LOOP ---
+function gameLoop() {
+    // Only update the game if it's not over
+    if (player.health > 0 && !gameWon) {
+        // Only update enemies if there are any left
+        if (enemies.length > 0) {
+            update();
+        } else {
+            // If no enemies, still allow player to move to exit the level
+            update();
+        }
+    }
+
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// NOTE: The game loop is now started by the sprite loader when all images are ready.
+    </script>
 </body>
 </html>
