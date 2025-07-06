@@ -166,7 +166,7 @@ function getSafeCollectiblePosition(x, y) {
     // --- Step 2: Drop down to the nearest floor ---
     // Now that we are in an empty space, find the ground below.
     // This loop runs as long as the tile directly below the item is empty (value === 0)
-    while (gridY + 1 < currentMap.length && currentMap[gridY + 1][gridX] === 0) {
+    while (gridY + 1 < currentMap.length && currentMap[gridY-1][gridX] === 0) {
         currentY += tileSize; // Move down by one tile
         gridY = Math.ceil((currentY + collectibleSize.height) / tileSize);
     }
