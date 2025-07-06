@@ -92,7 +92,7 @@ window.onload = function() {
             if (this.x + this.width > worldWidth) this.x = worldWidth - this.width;
         }
     };
-    const spritePaths = ['assets/girl1.png', 'assets/girl2.png', 'assets/hase.png', 'assets/beaurocrat.png', 'assets/passport.png'];
+    const spritePaths = ['./assets/girl1.png', './assets/girl2.png', './assets/hase.png', './assets/beaurocrat.png', './assets/passport.png'];
     const playerWalkSprites = [];
     let collectibleSprite;
     let enemySprite;
