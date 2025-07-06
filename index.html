@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Jump and Run Sidescroller</title>
+    <title>Лера Лера</title>
     <style>
         /* Basic page reset */
         body, html {
@@ -39,6 +39,10 @@ const tileSize = 40;
 const GRAVITY = 0.5;
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = 12;
+
+// --- GAME STATE ---
+// NEW: A variable to control the game's state (intro, playing, gameOver)
+let gameState = 'intro';
 
 // --- LEVEL DATA & MANAGEMENT ---
 
@@ -82,21 +86,12 @@ const levels = [
     {
         map: level1Data,
         enemies: [ { x: 400, y: 300 }, { x: 900, y: 200 }, { x: 1200, y: 300 } ],
-        collectibles: [
-            { x: 200, y: 200 }, // Might be floating
-            { x: 650, y: 360 }, // Might be inside the ground
-            { x: 1100, y: 120 } // Floating
-        ]
+        collectibles: [ { x: 200, y: 200 }, { x: 650, y: 360 }, { x: 1100, y: 120 } ]
     },
     {
         map: level2Data,
         enemies: [ { x: 300, y: 400 }, { x: 700, y: 100 }, { x: 1000, y: 400 }, { x: 1400, y: 200 } ],
-        collectibles: [
-            { x: 300, y: 160 },
-            { x: 500, y: 120 },
-            { x: 900, y: 280 }, // In the air over a gap
-            { x: 1300, y: 360 } // Inside a platform
-        ]
+        collectibles: [ { x: 300, y: 160 }, { x: 500, y: 120 }, { x: 900, y: 280 }, { x: 1300, y: 360 } ]
     }
 ];
 
@@ -105,13 +100,13 @@ let currentMap;
 let worldWidth;
 let gameWon = false;
 
-const player = { x: 100, y: 100, width: 32, height: 40, dx: 0, dy: 0, isOnGround: false, direction: 'right', health: 100, isAttacking: false, attackBox: { width: 40, height: 40 } };
+const player = { x: 100, y: 100, width: 42, height: 64, dx: 0, dy: 0, isOnGround: false, direction: 'right', health: 100, isAttacking: false, attackBox: { width: 40, height: 40 } };
 let enemies = [];
-function createEnemy(x, y) { enemies.push({ x, y, width: 32, height: 32, dx: 1, dy: 0, health: 50, patrolRange: 120, patrolStart: x }); }
+function createEnemy(x, y) { enemies.push({ x, y, width: 64, height: 64, dx: 1, dy: 0, health: 50, patrolRange: 220, patrolStart: x }); }
 
 let levelCollectibles = [];
 let totalCollectiblesInLevel = 0;
-const collectibleSize = { width: 32, height: 32 };
+const collectibleSize = { width: 42, height: 42 };
 
 const camera = { x: 0, y: 0, width: canvas.width, height: canvas.height,
     update: function() {
@@ -121,20 +116,22 @@ const camera = { x: 0, y: 0, width: canvas.width, height: canvas.height,
     }
 };
 
-const spritePaths = ['assets/girl1.png', 'assets/girl2.png', 'assets/hase.png'];
+const spritePaths = ['assets/girl1.png', 'assets/girl2.png', 'assets/hase.png', 'assets/beaurocrat.png'];
 const playerWalkSprites = [];
 let collectibleSprite;
+let enemySprite;
 let loadedImages = 0;
 let frameIndex = 0, frameCounter = 0;
-spritePaths.forEach((src, index) => {
+spritePaths.forEach((src) => {
     const img = new Image();
     img.onload = () => {
         loadedImages++;
         if (src.includes('girl')) playerWalkSprites.push(img);
         else if (src.includes('hase')) collectibleSprite = img;
+        else if (src.includes('beaurocrat')) enemySprite = img;
         if (loadedImages === spritePaths.length) {
             loadLevel(0);
-            requestAnimationFrame(gameLoop);
+            requestAnimationFrame(gameLoop); // Start the loop once everything is ready
         }
     };
     img.onerror = () => console.error(`Failed to load sprite: ${src}`);
@@ -145,67 +142,51 @@ const keys = { ArrowUp: false, ArrowLeft: false, ArrowRight: false, ' ': false, 
 document.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = true; } });
 document.addEventListener('keyup', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = false; } });
 
-
-// NEW: Helper function to find a safe spawn point for collectibles
+// CORRECTED: This version is more robust and handles edge cases better.
 function getSafeCollectiblePosition(x, y) {
     let currentY = y;
-    // We use the item's bottom center for grid checking
     let checkX = x + collectibleSize.width / 2;
 
-    // Convert pixel coordinates to grid indices
     let gridX = Math.floor(checkX / tileSize);
     let gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
 
-    // --- Step 1: Eject upwards if spawned inside a solid tile ---
-    // This loop runs as long as the item's base is inside a tile (value > 0)
-    while (gridY >= 0 && gridY < currentMap.length && currentMap[gridY+1][gridX] > 0) {
-        currentY -= tileSize; // Move up by one tile
+    // Eject upwards if starting inside a solid tile.
+    while (gridY >= 0 && gridY < currentMap.length && currentMap[gridY][gridX] > 0) {
+        currentY -= tileSize;
         gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
     }
 
-    // --- Step 2: Drop down to the nearest floor ---
-    // Now that we are in an empty space, find the ground below.
-    // This loop runs as long as the tile directly below the item is empty (value === 0)
-    while (gridY + 1 < currentMap.length && currentMap[gridY-1][gridX] === 0) {
-        currentY += tileSize; // Move down by one tile
-        gridY = Math.ceil((currentY + collectibleSize.height) / tileSize);
+    // Drop down to find the ground.
+    // Loop while the tile *below* the item's feet is empty.
+    while (gridY + 1 < currentMap.length && currentMap[gridY + 1][gridX] === 0) {
+        currentY += tileSize;
+        gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
     }
 
-    // --- Step 3: Final snap for pixel-perfect placement ---
-    // The final position is the top of the tile below, minus the item's height.
-    const finalY = (gridY + 2) * tileSize - collectibleSize.height;
-
-    // Return the safe coordinates. X remains unchanged.
+    // Final position is the top of the tile below, minus item height.
+    const finalY = (gridY + 1) * tileSize - collectibleSize.height;
     return { x: x, y: finalY };
 }
 
-
-// MODIFIED: `loadLevel` now uses the helper function to place items safely.
 function loadLevel(levelIndex) {
     if (levelIndex >= levels.length) {
         gameWon = true;
         return;
     }
-
     currentLevelIndex = levelIndex;
     currentMap = levels[currentLevelIndex].map;
     worldWidth = currentMap[0].length * tileSize;
-
     player.x = 100;
     player.y = 100;
     player.dx = 0;
     player.dy = 0;
-
     enemies = [];
     levels[currentLevelIndex].enemies.forEach(e => {
         createEnemy(e.x, e.y);
     });
-
     levelCollectibles = [];
     levels[currentLevelIndex].collectibles.forEach(c => {
-        // MODIFIED: Calculate a safe position before creating the item
         const safePosition = getSafeCollectiblePosition(c.x, c.y);
-
         levelCollectibles.push({
             x: safePosition.x,
             y: safePosition.y,
@@ -216,9 +197,18 @@ function loadLevel(levelIndex) {
     totalCollectiblesInLevel = levelCollectibles.length;
 }
 
-
 // --- GAME LOGIC (UPDATE FUNCTION) ---
 function update() {
+    // This function only runs when gameState is 'playing'
+    if (player.health <= 0) {
+        gameState = 'gameOver';
+        return;
+    }
+    if (gameWon) {
+        gameState = 'gameWon';
+        return;
+    }
+
     // 1. Handle Player Input
     if (keys.ArrowLeft) { player.dx = -PLAYER_SPEED; player.direction = 'left'; }
     else if (keys.ArrowRight) { player.dx = PLAYER_SPEED; player.direction = 'right'; }
@@ -238,7 +228,6 @@ function update() {
             if (currentMap[row][col] > 0) {
                 const tile = { x: col * tileSize, y: row * tileSize, width: tileSize, height: tileSize };
                 if (player.x < tile.x + tile.width && player.x + player.width > tile.x && player.y < tile.y + tile.height && player.y + player.height > tile.y) {
-                    const overlapY = (player.y + player.height) - tile.y;
                     const prevOverlapY = (player.y - player.dy + player.height) - tile.y;
                     if (player.dy > 0 && prevOverlapY <= 0) { player.y = tile.y - player.height; player.dy = 0; player.isOnGround = true; }
                 }
@@ -299,8 +288,44 @@ function update() {
     }
 }
 
-// --- RENDERING (DRAW FUNCTION) --- (No changes here)
+// --- RENDERING (DRAW FUNCTION) ---
+
+// NEW: A dedicated function to draw the intro screen
+function drawIntroScreen() {
+    ctx.fillStyle = '#1e293b'; // Same as canvas background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+
+    ctx.font = '50px Consolas';
+    ctx.fillText('Лера Лера', canvas.width / 2, canvas.height / 2 - 120);
+
+    ctx.font = '24px Consolas';
+    ctx.fillText('Соберите всех кроликов, чтобы продвинуться вперед!', canvas.width / 2, canvas.height / 2 - 50);
+    ctx.fillText('остерегайтесь немецких бюрократов!', canvas.width / 2, canvas.height / 2 - 30);
+    ctx.font = '20px Consolas';
+    ctx.fillText('Controls:', canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('Arrow Keys = Move Left/Right', canvas.width / 2, canvas.height / 2 + 50);
+    ctx.fillText('Space / Up Arrow = Jump', canvas.width / 2, canvas.height / 2 + 80);
+    ctx.fillText('X = Attack', canvas.width / 2, canvas.height / 2 + 110);
+
+
+    ctx.font = '30px Consolas';
+    ctx.fillStyle = '#8bc34a'; // Green color for prompt
+    ctx.fillText('Press SPACE to Start', canvas.width / 2, canvas.height / 2 + 180);
+}
+
+
+// MODIFIED: The main draw function now handles different game states.
 function draw() {
+    // If we're in the intro state, only draw that and nothing else.
+    if (gameState === 'intro') {
+        drawIntroScreen();
+        return;
+    }
+
+    // --- Normal Game Drawing ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
@@ -327,9 +352,12 @@ function draw() {
         });
     }
 
-    // Draw enemies
-    ctx.fillStyle = 'red';
-    enemies.forEach(enemy => ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height));
+    // Draw Enemies
+    if(enemySprite) {
+        enemies.forEach(enemy => {
+            ctx.drawImage(enemySprite, enemy.x, enemy.y, enemy.width, enemy.height);
+        });
+    }
 
     // Draw player
     ctx.save();
@@ -337,7 +365,6 @@ function draw() {
     if (playerWalkSprites[frameIndex]) { ctx.drawImage(playerWalkSprites[frameIndex], player.x, player.y, player.width, player.height); }
     ctx.restore();
 
-    // Draw attack box for visualization
     if (player.isAttacking) {
         ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
         let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
@@ -355,15 +382,14 @@ function draw() {
     const collectedCount = totalCollectiblesInLevel - levelCollectibles.length;
     ctx.fillText(`Items: ${collectedCount} / ${totalCollectiblesInLevel}`, 10, 70);
 
-
     // Win/Loss/Level Clear Messages
     ctx.font = '60px Consolas'; ctx.textAlign = 'center';
-    if (player.health <= 0) {
+    if (gameState === 'gameOver') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.fillStyle = 'red'; ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
-    } else if (gameWon) {
+        ctx.fillStyle = 'red'; ctx.fillText('You are Great, try again', canvas.width / 2, canvas.height / 2);
+    } else if (gameState === 'gameWon') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.fillStyle = 'gold'; ctx.fillText('GAME COMPLETE!', canvas.width / 2, canvas.height / 2);
+        ctx.fillStyle = 'gold'; ctx.fillText('Ура! Tы получилa немецкий паспорт!', canvas.width / 2, canvas.height / 2);
     } else if (levelCollectibles.length === 0) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0,0, canvas.width, canvas.height);
@@ -375,14 +401,26 @@ function draw() {
 }
 
 // --- GAME LOOP ---
+// MODIFIED: The loop now handles state transitions
 function gameLoop() {
-    if (player.health > 0 && !gameWon) {
-        update();
+    // State logic comes first
+    if (gameState === 'intro') {
+        // If we are on the intro screen, check for the space key to start the game
+        if (keys[' ']) {
+            gameState = 'playing';
+            keys[' '] = false; // Prevents the player from jumping immediately
+        }
+    } else if (gameState === 'playing') {
+        update(); // Run the main game logic
     }
 
+    // Drawing happens every frame, regardless of state
     draw();
+
     requestAnimationFrame(gameLoop);
 }
+
+// The game loop is started by the sprite loader when all images are ready.
     </script>
 </body>
 </html>
