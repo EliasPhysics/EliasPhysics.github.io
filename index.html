@@ -153,8 +153,8 @@ function getSafeCollectiblePosition(x, y) {
     let checkX = x + collectibleSize.width / 2;
 
     // Convert pixel coordinates to grid indices
-    let gridX = Math.ceil(checkX / tileSize);
-    let gridY = Math.ceil((currentY + collectibleSize.height) / tileSize);
+    let gridX = Math.floor(checkX / tileSize);
+    let gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
 
     // --- Step 1: Eject upwards if spawned inside a solid tile ---
     // This loop runs as long as the item's base is inside a tile (value > 0)
