@@ -41,7 +41,6 @@ const PLAYER_SPEED = 5;
 const JUMP_FORCE = 12;
 
 // --- GAME STATE ---
-// NEW: A variable to control the game's state (intro, playing, gameOver)
 let gameState = 'intro';
 
 // --- LEVEL DATA & MANAGEMENT ---
@@ -116,12 +115,15 @@ const camera = { x: 0, y: 0, width: canvas.width, height: canvas.height,
     }
 };
 
-const spritePaths = ['assets/girl1.png', 'assets/girl2.png', 'assets/hase.png', 'assets/beaurocrat.png'];
+// MODIFIED: Added 'assets/passport.png' to the list of sprites to load
+const spritePaths = ['assets/girl1.png', 'assets/girl2.png', 'assets/hase.png', 'assets/beaurocrat.png', 'assets/passport.png'];
 const playerWalkSprites = [];
 let collectibleSprite;
 let enemySprite;
+let passportSprite; // NEW: Variable to hold the passport image
 let loadedImages = 0;
 let frameIndex = 0, frameCounter = 0;
+
 spritePaths.forEach((src) => {
     const img = new Image();
     img.onload = () => {
@@ -129,9 +131,11 @@ spritePaths.forEach((src) => {
         if (src.includes('girl')) playerWalkSprites.push(img);
         else if (src.includes('hase')) collectibleSprite = img;
         else if (src.includes('beaurocrat')) enemySprite = img;
+        else if (src.includes('passport')) passportSprite = img; // NEW: Assign the loaded passport image
+
         if (loadedImages === spritePaths.length) {
             loadLevel(0);
-            requestAnimationFrame(gameLoop); // Start the loop once everything is ready
+            requestAnimationFrame(gameLoop);
         }
     };
     img.onerror = () => console.error(`Failed to load sprite: ${src}`);
@@ -142,28 +146,19 @@ const keys = { ArrowUp: false, ArrowLeft: false, ArrowRight: false, ' ': false, 
 document.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = true; } });
 document.addEventListener('keyup', e => { if (keys.hasOwnProperty(e.key)) { e.preventDefault(); keys[e.key] = false; } });
 
-// CORRECTED: This version is more robust and handles edge cases better.
 function getSafeCollectiblePosition(x, y) {
     let currentY = y;
     let checkX = x + collectibleSize.width / 2;
-
     let gridX = Math.floor(checkX / tileSize);
     let gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
-
-    // Eject upwards if starting inside a solid tile.
     while (gridY >= 0 && gridY < currentMap.length && currentMap[gridY][gridX] > 0) {
         currentY -= tileSize;
         gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
     }
-
-    // Drop down to find the ground.
-    // Loop while the tile *below* the item's feet is empty.
     while (gridY + 1 < currentMap.length && currentMap[gridY + 1][gridX] === 0) {
         currentY += tileSize;
         gridY = Math.floor((currentY + collectibleSize.height) / tileSize);
     }
-
-    // Final position is the top of the tile below, minus item height.
     const finalY = (gridY + 1) * tileSize - collectibleSize.height;
     return { x: x, y: finalY };
 }
@@ -181,9 +176,7 @@ function loadLevel(levelIndex) {
     player.dx = 0;
     player.dy = 0;
     enemies = [];
-    levels[currentLevelIndex].enemies.forEach(e => {
-        createEnemy(e.x, e.y);
-    });
+    levels[currentLevelIndex].enemies.forEach(e => { createEnemy(e.x, e.y); });
     levelCollectibles = [];
     levels[currentLevelIndex].collectibles.forEach(c => {
         const safePosition = getSafeCollectiblePosition(c.x, c.y);
@@ -197,32 +190,18 @@ function loadLevel(levelIndex) {
     totalCollectiblesInLevel = levelCollectibles.length;
 }
 
-// --- GAME LOGIC (UPDATE FUNCTION) ---
 function update() {
-    // This function only runs when gameState is 'playing'
-    if (player.health <= 0) {
-        gameState = 'gameOver';
-        return;
-    }
-    if (gameWon) {
-        gameState = 'gameWon';
-        return;
-    }
-
-    // 1. Handle Player Input
+    if (player.health <= 0) { gameState = 'gameOver'; return; }
+    if (gameWon) { gameState = 'gameWon'; return; }
     if (keys.ArrowLeft) { player.dx = -PLAYER_SPEED; player.direction = 'left'; }
     else if (keys.ArrowRight) { player.dx = PLAYER_SPEED; player.direction = 'right'; }
     else { player.dx = 0; }
     if ((keys.ArrowUp || keys[' ']) && player.isOnGround) { player.dy = -JUMP_FORCE; player.isOnGround = false; }
     if ((keys['x'] || keys['X']) && !player.isAttacking) { player.isAttacking = true; setTimeout(() => { player.isAttacking = false; }, 300); }
-
-    // 2. Apply Physics
     player.dy += GRAVITY;
     player.x += player.dx;
     player.y += player.dy;
     player.isOnGround = false;
-
-    // 3. Player vs. Level Collision
     for (let row = 0; row < currentMap.length; row++) {
         for (let col = 0; col < currentMap[row].length; col++) {
             if (currentMap[row][col] > 0) {
@@ -234,8 +213,6 @@ function update() {
             }
         }
     }
-
-    // 4. Update Enemies
     enemies.forEach(enemy => {
         enemy.dy += GRAVITY;
         enemy.y += enemy.dy;
@@ -248,8 +225,6 @@ function update() {
             if (enemy.x < enemy.patrolStart || enemy.x > enemy.patrolStart + enemy.patrolRange) { enemy.dx *= -1; }
         }
     });
-
-    // 5. Combat and Enemy Collision
     if (player.isAttacking) {
         let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
         enemies.forEach((enemy, index) => {
@@ -264,73 +239,50 @@ function update() {
             player.health -= 5;
         }
     });
-
-    // 6. Player vs. Collectible Collision
     for (let i = levelCollectibles.length - 1; i >= 0; i--) {
         const item = levelCollectibles[i];
         if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
             levelCollectibles.splice(i, 1);
         }
     }
-
-    // 7. Update Camera
     camera.update();
-
-    // 8. Update Animation Frame
     if (player.dx !== 0 && player.isOnGround) {
         frameCounter++;
         if (frameCounter > 8) { frameIndex = (frameIndex + 1) % playerWalkSprites.length; frameCounter = 0; }
     } else { frameIndex = 0; }
-
-    // 9. Check for Level Transition
     if (player.x > worldWidth && levelCollectibles.length === 0) {
         loadLevel(currentLevelIndex + 1);
     }
 }
 
-// --- RENDERING (DRAW FUNCTION) ---
-
-// NEW: A dedicated function to draw the intro screen
 function drawIntroScreen() {
-    ctx.fillStyle = '#1e293b'; // Same as canvas background
+    ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
-
     ctx.font = '50px Consolas';
     ctx.fillText('Лера Лера', canvas.width / 2, canvas.height / 2 - 120);
-
     ctx.font = '24px Consolas';
     ctx.fillText('Соберите всех кроликов, чтобы продвинуться вперед!', canvas.width / 2, canvas.height / 2 - 50);
-    ctx.fillText('остерегайтесь немецких бюрократов!', canvas.width / 2, canvas.height / 2 - 30);
+    ctx.fillText('остерегайтесь немецких бюрократов!', canvas.width / 2, canvas.height / 2 - 20);
     ctx.font = '20px Consolas';
-    ctx.fillText('Controls:', canvas.width / 2, canvas.height / 2 + 20);
-    ctx.fillText('Arrow Keys = Move Left/Right', canvas.width / 2, canvas.height / 2 + 50);
-    ctx.fillText('Space / Up Arrow = Jump', canvas.width / 2, canvas.height / 2 + 80);
-    ctx.fillText('X = Attack', canvas.width / 2, canvas.height / 2 + 110);
-
-
+    ctx.fillText('Controls:', canvas.width / 2, canvas.height / 2 + 30);
+    ctx.fillText('Arrow Keys = Move Left/Right', canvas.width / 2, canvas.height / 2 + 60);
+    ctx.fillText('Space / Up Arrow = Jump', canvas.width / 2, canvas.height / 2 + 90);
+    ctx.fillText('X = Attack', canvas.width / 2, canvas.height / 2 + 120);
     ctx.font = '30px Consolas';
-    ctx.fillStyle = '#8bc34a'; // Green color for prompt
+    ctx.fillStyle = '#8bc34a';
     ctx.fillText('Press SPACE to Start', canvas.width / 2, canvas.height / 2 + 180);
 }
 
-
-// MODIFIED: The main draw function now handles different game states.
 function draw() {
-    // If we're in the intro state, only draw that and nothing else.
     if (gameState === 'intro') {
         drawIntroScreen();
         return;
     }
-
-    // --- Normal Game Drawing ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
-
-    // Draw level
     for (let y = 0; y < currentMap.length; y++) {
         for (let x = 0; x < currentMap[y].length; x++) {
             if (currentMap[y][x] > 0) {
@@ -344,35 +296,26 @@ function draw() {
             }
         }
     }
-
-    // Draw Collectibles
-    if(collectibleSprite) {
+    if (collectibleSprite) {
         levelCollectibles.forEach(item => {
             ctx.drawImage(collectibleSprite, item.x, item.y, item.width, item.height);
         });
     }
-
-    // Draw Enemies
-    if(enemySprite) {
+    if (enemySprite) {
         enemies.forEach(enemy => {
             ctx.drawImage(enemySprite, enemy.x, enemy.y, enemy.width, enemy.height);
         });
     }
-
-    // Draw player
     ctx.save();
     if (player.direction === 'left') { ctx.scale(-1, 1); ctx.translate(-player.x * 2 - player.width, 0); }
     if (playerWalkSprites[frameIndex]) { ctx.drawImage(playerWalkSprites[frameIndex], player.x, player.y, player.width, player.height); }
     ctx.restore();
-
     if (player.isAttacking) {
         ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
         let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
         ctx.fillRect(attackX, player.y, player.attackBox.width, player.attackBox.height);
     }
     ctx.restore();
-
-    // Draw UI
     ctx.fillStyle = 'red'; ctx.fillRect(10, 10, 200, 20);
     ctx.fillStyle = 'green'; ctx.fillRect(10, 10, player.health * 2, 20);
     ctx.strokeStyle = 'white'; ctx.strokeRect(10, 10, 200, 20);
@@ -380,47 +323,50 @@ function draw() {
     ctx.fillText('HEALTH', 15, 26);
     ctx.fillText(`Level: ${currentLevelIndex + 1}`, 10, 50);
     const collectedCount = totalCollectiblesInLevel - levelCollectibles.length;
-    ctx.fillText(`Items: ${collectedCount} / ${totalCollectiblesInLevel}`, 10, 70);
-
-    // Win/Loss/Level Clear Messages
+    ctx.fillText(`кролики: ${collectedCount} / ${totalCollectiblesInLevel}`, 10, 70);
     ctx.font = '30px Consolas'; ctx.textAlign = 'center';
+
     if (gameState === 'gameOver') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
         ctx.fillStyle = 'red'; ctx.fillText('You are Great, try again', canvas.width / 2, canvas.height / 2);
     } else if (gameState === 'gameWon') {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.fillStyle = 'gold'; ctx.fillText('Ура! Tы получилa немецкий паспорт!', canvas.width / 2, canvas.height / 2);
+        // MODIFIED: Draw the final win screen with the passport image
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'gold';
+        // Moved text up to make space for the image
+        ctx.fillText('Ура! Tы получилa немецкий паспорт!', canvas.width / 2, canvas.height / 2 - 100);
+
+        // Draw the passport image if it has been loaded
+        if (passportSprite) {
+            const imgWidth = 250; // A good display width for the image
+            const imgHeight = passportSprite.height * (imgWidth / passportSprite.width); // Maintain aspect ratio
+            const imgX = (canvas.width - imgWidth) / 2; // Center horizontally
+            const imgY = canvas.height / 2 - 60; // Position it below the text
+            ctx.drawImage(passportSprite, imgX, imgY, imgWidth, imgHeight);
+        }
     } else if (levelCollectibles.length === 0) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0,0, canvas.width, canvas.height);
         ctx.fillStyle = 'cyan';
-        ctx.fillText('ALL ITEMS COLLECTED!', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Все кролики собраны!', canvas.width / 2, canvas.height / 2);
         ctx.font = '20px Consolas';
-        ctx.fillText('Proceed to the right exit...', canvas.width/2, canvas.height/2 + 40);
+        ctx.fillText('перейдите вправо, чтобы продолжить...', canvas.width/2, canvas.height/2 + 40);
     }
 }
 
-// --- GAME LOOP ---
-// MODIFIED: The loop now handles state transitions
 function gameLoop() {
-    // State logic comes first
     if (gameState === 'intro') {
-        // If we are on the intro screen, check for the space key to start the game
         if (keys[' ']) {
             gameState = 'playing';
-            keys[' '] = false; // Prevents the player from jumping immediately
+            keys[' '] = false;
         }
     } else if (gameState === 'playing') {
-        update(); // Run the main game logic
+        update();
     }
-
-    // Drawing happens every frame, regardless of state
     draw();
-
     requestAnimationFrame(gameLoop);
 }
 
-// The game loop is started by the sprite loader when all images are ready.
     </script>
 </body>
 </html>
