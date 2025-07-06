@@ -254,14 +254,14 @@ function update() {
         let attackX = player.direction === 'right' ? player.x + player.width : player.x - player.attackBox.width;
         enemies.forEach((enemy, index) => {
             if (attackX < enemy.x + enemy.width && attackX + player.attackBox.width > enemy.x && player.y < enemy.y + player.height && player.y + player.attackBox.height > enemy.y) {
-                enemy.health -= 50;
+                enemy.health -= 20;
                 if (enemy.health <= 0) enemies.splice(index, 1);
             }
         });
     }
     enemies.forEach(enemy => {
         if (player.x < enemy.x + enemy.width && player.x + player.width > enemy.x && player.y < enemy.y + enemy.height && player.y + player.height > enemy.y) {
-            player.health -= 1;
+            player.health -= 5;
         }
     });
 
@@ -383,7 +383,7 @@ function draw() {
     ctx.fillText(`Items: ${collectedCount} / ${totalCollectiblesInLevel}`, 10, 70);
 
     // Win/Loss/Level Clear Messages
-    ctx.font = '60px Consolas'; ctx.textAlign = 'center';
+    ctx.font = '30px Consolas'; ctx.textAlign = 'center';
     if (gameState === 'gameOver') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0,0, canvas.width, canvas.height);
         ctx.fillStyle = 'red'; ctx.fillText('You are Great, try again', canvas.width / 2, canvas.height / 2);
